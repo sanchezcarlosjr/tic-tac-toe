@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Tic Tac Toe</title>
+		<link href="https://fonts.googleapis.com/css?family=Lato:300,400,700,900" rel="stylesheet" />
+		<link href="https://fonts.googleapis.com/css2?family=Finger+Paint&display=swap" rel="stylesheet">
+		<!-- https://github.com/trohalska/Tic-tac-toe -->
+		<link rel="stylesheet" href="style.css">
+		<script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+	</head>
+	<body>
+		<h1 id="title">Tic tac toe by Carlos Eduardo Sanchez Torres</h1>
+		<p>Code on <a href="https://github.com/sanchezcarlosjr/tic-tac-toe-web3">Tic Tac Toe WebRTC Code</a>. Template by https://github.com/trohalska/Tic-tac-toe</p>
+		<main>
+			<section id="field">
+				<div id="container">
+					<div id="row=0&column=0" class="cell"></div>
+					<div id="row=0&column=1" class="cell"></div>
+					<div id="row=0&column=2" class="cell"></div>
+					<div id="row=1&column=0" class="cell"></div>
+					<div id="row=1&column=1" class="cell"></div>
+					<div id="row=1&column=2" class="cell"></div>
+					<div id="row=2&column=0" class="cell"></div>
+					<div id="row=2&column=1" class="cell"></div>
+					<div id="row=2&column=2" class="cell"></div>
+				</div>
+			</section>
+			<section id="sidebar">
+				<div id="turns">
+					<p id="titleTurns">Number of turns</p>
+					<p id="numberTurns">0</p>
+				</div>
+				<h2 id="status">Connecting to signal server</h2>
+				<button style="visibility: hidden" id="play_with_computer_button" type="button" onclick="window.playWithTheComputer()">Play with the computer</button>
+			</section>
+		</main>
+		<script>
+			 const peer = new Peer();
+			 let conn = null;
+			 const movementAudio = new Audio("Swoosh_3_SoundBible-com_1573211927.mp3");
+			 const winningAudio = new Audio("Auditorium_Applause_SoundBible_com_280911206.mp3");
+			 let lastPeerId = null;
+			 const MOVE = 0;
+			 const WAIT = 1;
+			 const X = 'X';
+			 const O = 'O';
+			 let currentSymbol = null;
+			 let isSender = false;
+			 class Videogame {
+				currentState = null;
+				states = {};
+				on(state, caller) {
+					this.states[state] = caller;
+				}
+				changeStatus(status) {
+					document.getElementById("status").innerHTML = status;
+				}
+				notify(state, params=null) {
+					this.currentState = state;
+					this.states[state](params);
+				}
+			 }
+			 const videogame = new Videogame();
+			 videogame.on('start', () => {
+				 videogame.changeStatus("Connecting to signal server");
+			 });
+			 videogame.on('connect', (connection) => {
+				 videogame.changeStatus("Connecting to peer...");
+				 if (isSender) {
+					 connection.on('open', function() {
+						 connection.send("Sender does not accept incoming connections");
+						 setTimeout(function() { connection.close(); }, 500);
+					 });
+				 }
+				 // Allow only a single connection
+				 if (conn && conn.open) {
+					 connection.on('open', function() {
+						 connection.send("Already connected to another client");
+						 setTimeout(function() { connection.close(); }, 500);
+					 });
+				 }
+				 conn = connection;
+				 videogame.notify('start-match');
+			 });
+			 videogame.on('open', (id) => {
+				 videogame.changeStatus("Setting...");
+				 const params = new URLSearchParams(document.location.search);
+				 const state = params.has("game") ? "join-game" : "new-game";
+				 if (params.has("game")) {
+					 videogame.notify("join-game", params.get("game"));
+					 return;
+				 }
+				 videogame.notify("new-game", id);
+			 });
+			 videogame.on('new-game', (id) => {
+				 const url = new URL(window.location);
+				 url.searchParams.set('game', id);
+				 window.history.pushState({}, '', url);
+				 isSender = false;
+				 currentSymbol = X;
+				 videogame.changeStatus("Share the URL!");
+			 });
+			 videogame.on('join-game', (id) => {
+				 if (conn) {
+					 conn.close();
+				 }
+				 conn = peer.connect(id, {
+					 reliable: true
+				 });
+				 conn.on('open', function () {
+					 videogame.notify('start-match');
+				 });
+				 isSender = true;
+				 currentSymbol = O;
+			 });
+			 videogame.on('start-match', () => {
+				 console.log("Peer ID: ", conn.peer);
+				 conn.on('data', function (data) {
+					 videogame.notify('record-opponent-movement', JSON.parse(data));
+				 });
+				 conn.on('close', function () {
+					 conn = null;
+					 videogame.notify("close");
+				 });
+				 if (currentSymbol == X) 
+					 return videogame.notify(MOVE);
+				 videogame.notify(WAIT);
+			 });
+			 videogame.on('record-opponent-movement', (message) => {
+				 console.log(message);
+				 if (videogame.currentState == MOVE)
+					 return "You are opponent is a cheater!";
+				 document.getElementById(`row=${message.row}&column=${message.column}`).innerHTML = message.symbol;
+				 movementAudio.play();
+				 videogame.notify(MOVE);
+			 });
+			 videogame.on(MOVE, () => {
+				 document.getElementById("numberTurns").innerHTML++;
+				 videogame.changeStatus("Move");
+			 });
+			 videogame.on(WAIT, () => {
+				 document.getElementById("numberTurns").innerHTML++;
+				 videogame.changeStatus("Wait");
+			 });
+			 videogame.on('close', () => {
+				 videogame.changeStatus("Connection close!");
+			 });
+			 videogame.on('disconnected', () => {
+				 peer.id = lastPeerId;
+				 peer._lastServerId = lastPeerId;
+				 peer.reconnect();
+				 videogame.changeStatus("Connection lost. Please reconnect.");
+			 });
+			 videogame.on('error', () => {
+				 console.log(conn);
+				 videogame.changeStatus("Something bad happen. Please refresh!");
+			 });
+			 videogame.notify("start");
+			 peer.on('open', function (id) {
+				 // Workaround for peer.reconnect deleting previous id
+				 [peer.id, lastPeerId] = peer.id === null ? [lastPeerId, lastPeerId] : [peer.id, peer.id]; 
+				 console.log('ID: ' + peer.id);
+				 videogame.notify("open", peer.id);
+			 });
+			 peer.on('connection', function (connection) {
+				 videogame.notify("connect", connection);
+			 });
+			 peer.on('disconnected', function () {
+				 videogame.notify('disconnected');
+			 });
+			 peer.on('close', function() {
+				 conn = null;
+				 videogame.notify('close');
+			 });
+			 peer.on('error', function (err) {
+				 console.warn(err);
+				 videogame.notify('error');
+			 });
+			 function captureRowAndColumn(id) {
+				 const regex_row_column = /row=([0-8])&column=([0-8])/;
+				 const matches = id.match(regex_row_column);
+				 return {
+					 row: parseInt(matches[1]),
+					 column: parseInt(matches[2])
+				 };
+			 }
+			 for(const element of document.getElementsByClassName("cell")) {
+				 const position = captureRowAndColumn(element.id);
+				 element.addEventListener('click', (event) => {
+					 if (videogame.currentState !== MOVE || event.target.innerHTML !== "") {
+						 return;
+					 }
+					 event.target.innerHTML = currentSymbol;
+					 movementAudio.play();
+					 conn.send(JSON.stringify({symbol: currentSymbol, ...position}));
+					 videogame.notify(WAIT);
+				 });
+			 }
+		</script>
+	</body>
+</html>
