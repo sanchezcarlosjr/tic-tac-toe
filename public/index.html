@@ -37,7 +37,22 @@
 				<button style="visibility: hidden" id="play_with_computer_button" type="button" onclick="window.playWithTheComputer()">Play with the computer</button>
 			</section>
 		</main>
-		<script>
+		<script type="module">
+		        const importObject = {
+		           env: {
+	                      print_string: function (str) {
+		                console.log(str);
+	                      },
+			      print_int: function (str) {
+		                console.log(str);
+	                      },
+			      notify_to_view: (state) => videogame.notify(state)
+		           }
+		        };
+		        const tictactoe = await (async (url) => {
+		             const {instance} = await WebAssembly.instantiateStreaming(fetch(url), importObject);
+		             return instance;
+			 })("tictactoe.wasm");
 			 const peer = new Peer();
 			 let conn = null;
 			 const movementAudio = new Audio("Swoosh_3_SoundBible-com_1573211927.mp3");
@@ -45,6 +60,9 @@
 			 let lastPeerId = null;
 			 const MOVE = 0;
 			 const WAIT = 1;
+			 const WIN = 10;
+			 const TIE = 11;
+			 const LOST = 12;
 			 const X = 'X';
 			 const O = 'O';
 			 let currentSymbol = null;
@@ -103,6 +121,17 @@
 				 currentSymbol = X;
 				 videogame.changeStatus("Share the URL!");
 			 });
+			 videogame.on(WIN, () => {
+			       console.log("WIN!");
+			       videogame.changeStatus("Win!");
+			 });
+			 videogame.on(TIE, () => {
+			       videogame.changeStatus("Tie.");
+			 });
+			 videogame.on(LOST, () => {
+			       console.log("LOST!");
+			       videogame.changeStatus("Lost! Game over.");
+			 });
 			 videogame.on('join-game', (id) => {
 				 if (conn) {
 					 conn.close();
@@ -117,7 +146,6 @@
 				 currentSymbol = O;
 			 });
 			 videogame.on('start-match', () => {
-				 console.log("Peer ID: ", conn.peer);
 				 conn.on('data', function (data) {
 					 videogame.notify('record-opponent-movement', JSON.parse(data));
 				 });
@@ -125,17 +153,18 @@
 					 conn = null;
 					 videogame.notify("close");
 				 });
+				 tictactoe.exports.start_match(X, O);
 				 if (currentSymbol == X) 
 					 return videogame.notify(MOVE);
 				 videogame.notify(WAIT);
 			 });
 			 videogame.on('record-opponent-movement', (message) => {
-				 console.log(message);
 				 if (videogame.currentState == MOVE)
 					 return "You are opponent is a cheater!";
 				 document.getElementById(`row=${message.row}&column=${message.column}`).innerHTML = message.symbol;
 				 movementAudio.play();
 				 videogame.notify(MOVE);
+				 tictactoe.exports.next(message.row, message.column);
 			 });
 			 videogame.on(MOVE, () => {
 				 document.getElementById("numberTurns").innerHTML++;
@@ -161,8 +190,11 @@
 			 videogame.notify("start");
 			 peer.on('open', function (id) {
 				 // Workaround for peer.reconnect deleting previous id
-				 [peer.id, lastPeerId] = peer.id === null ? [lastPeerId, lastPeerId] : [peer.id, peer.id]; 
-				 console.log('ID: ' + peer.id);
+			         if (peer.id === null) {
+				    peer.id = lastPeerId;
+				 } else {
+				    lastPeerId = peer.id;
+				 }
 				 videogame.notify("open", peer.id);
 			 });
 			 peer.on('connection', function (connection) {
@@ -176,7 +208,6 @@
 				 videogame.notify('close');
 			 });
 			 peer.on('error', function (err) {
-				 console.warn(err);
 				 videogame.notify('error');
 			 });
 			 function captureRowAndColumn(id) {
@@ -197,6 +228,7 @@
 					 movementAudio.play();
 					 conn.send(JSON.stringify({symbol: currentSymbol, ...position}));
 					 videogame.notify(WAIT);
+					 tictactoe.exports.next(position.row, position.column);
 				 });
 			 }
 		</script>
