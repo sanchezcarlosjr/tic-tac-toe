@@ -31,7 +31,7 @@
 			<section id="sidebar">
 				<div id="turns">
 					<p id="titleTurns">Number of turns</p>
-					<p id="numberTurns">0</p>
+					<p id="numberTurns">-1</p>
 				</div>
 				<h2 id="status">Connecting to signal server</h2>
 				<button style="visibility: hidden" id="play_with_computer_button" type="button" onclick="window.playWithTheComputer()">Play with the computer</button>
@@ -122,15 +122,14 @@
 				 videogame.changeStatus("Share the URL!");
 			 });
 			 videogame.on(WIN, () => {
-			       console.log("WIN!");
-			       videogame.changeStatus("Win!");
+			       videogame.changeStatus("You are the winner!");
+			       winningAudio.play();
 			 });
 			 videogame.on(TIE, () => {
 			       videogame.changeStatus("Tie.");
 			 });
 			 videogame.on(LOST, () => {
-			       console.log("LOST!");
-			       videogame.changeStatus("Lost! Game over.");
+			       videogame.changeStatus("You lost! Game over.");
 			 });
 			 videogame.on('join-game', (id) => {
 				 if (conn) {
@@ -153,7 +152,7 @@
 					 conn = null;
 					 videogame.notify("close");
 				 });
-				 tictactoe.exports.start_match(X, O);
+				 tictactoe.exports.start_match(isSender);
 				 if (currentSymbol == X) 
 					 return videogame.notify(MOVE);
 				 videogame.notify(WAIT);
