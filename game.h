@@ -84,9 +84,12 @@ class PassivePlayer: public Player {
 	public:	
 		PassivePlayer(char symbol): Player(symbol) {}
 		Coordinate win() override {
+		       notify_to_view(LOST);
 		       return coordinate;
 		}
-		void lose(Coordinate coordinate) override {}
+		void lose(Coordinate coordinate) override {
+		       notify_to_view(WIN);
+		}
 };
 
 

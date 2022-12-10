@@ -22,7 +22,7 @@ $(OUTPUT): $(OBJ) $(NANOLIBC_OBJ) Makefile
 		--strip-all \
 		--export-dynamic \
 		--allow-undefined \
-		--initial-memory=524288 \
+		--initial-memory=131072 \
 		-error-limit=0 \
 		--lto-O3 \
 		-O3 \
